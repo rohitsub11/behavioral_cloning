@@ -4,6 +4,11 @@ from keras.models import Sequential
 from keras.utils import np_utils
 import json
 import argparse
+import csv
+import matplotlib.pyplot as plt
+
+#data path
+data_folder = 'data/'
 
 def trial_model():
 	row, col, channels = 66, 200, 3 #camera format
@@ -36,6 +41,40 @@ def trial_model():
 
 	return model
 
+#to load the data from saved file
+def get_data(X, y, data_folder, delta):
+	log_path = data_folder + 'driving_log.csv'
+	logs = []
+
+	with open(log_path, 'rt') as f:
+		reader = csv.reader(f)
+		for line in reader:
+			logs.append(line)
+		logs_labels = logs.pop(0)
+
+	# load center camera image
+	for i in range(len(logs)):
+		img_path = logs[i][0]
+		img_path = data_folder+'IMG'+(img_path.split('IMG')[1]).strip()
+		img = plt.imread(img_path)
+		X.append(img)#image_preprocessing(img))
+		y.append(float(logs[i][3]))
+
+	# load left camera image
+	for i in range(len(logs)):
+		img_path = logs[i][1]
+		img_path = data_folder+'IMG'+(img_path.split('IMG')[1]).strip()
+		img = plt.imread(img_path)
+		X.append(img)#image_preprocessing(img))
+		y.append(float(logs[i][3]) + delta)
+
+	# load right camera image
+	for i in range(len(logs)):
+		img_path = logs[i][2]
+		img_path = data_folder+'IMG'+(img_path.split('IMG')[1]).strip()
+		img = plt.imread(img_path)
+		X.append(img)#image_preprocessing(img))
+		y.append(float(logs[i][3]) - delta)
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Steering angle model trainer')
@@ -46,6 +85,14 @@ if __name__ == "__main__":
 	parser.set_defaults(skipvalidate=False)
 	parser.set_defaults(loadweights=False)
 	args = parser.parse_args()
+
+	print("loading data...")
+
+	data={}
+	data['features'] = []
+	data['labels'] = []
+
+	get_data(data['features'], data['labels'],data_folder,0.3)
 
 	model = trial_model()
 
