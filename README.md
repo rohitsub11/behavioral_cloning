@@ -8,4 +8,4 @@ I recorded my own images using Udacity simulator in training mode. However, Udac
 
 The model that I started with is based on the Nvidia Paper. The model is as follows:
 
-![alt tag](./model_nvidia.png)
+![alt tag](model_nvidia.png)
