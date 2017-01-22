@@ -6,11 +6,11 @@ import json
 import argparse
 
 def trial_model():
-	channels, row, col = 3, 160, 320 #camera format
+	row, col, channels = 66, 200, 3 #camera format
 
 	model = Sequential()
-	model.add(Lambda(lambda x: x/255 - 0.5, input_shape = (channels, row, col),
-					output_shape = (channels, row, col)))
+	model.add(Lambda(lambda x: x/255 - .5, input_shape = (row, col, channels),
+					output_shape = (row, col, channels)))
 	model.add(Conv2D(24, 5, 5, subsample=(2, 2), border_mode="valid", activation='relu'))
 	#model.add(MaxPooling2D(pool_size=(2, 2)))
 	model.add(Conv2D(36, 5, 5, subsample=(2, 2), border_mode="valid", activation='relu'))
@@ -21,18 +21,21 @@ def trial_model():
 
 	#FC layers
 	model.add(Flatten())
+	model.add(Dense(1164, activation='relu'))
+
 	model.add(Dense(100, activation='relu'))
-	model.add(Dropout(0.5))
+	
 	model.add(Dense(50, activation='relu'))
-	model.add(Dropout(0.5))
+	
 	model.add(Dense(10, activation='relu'))
-	model.add(Dropout(0.5))
+	
 	model.add(Dense(1))
 
 	model.summary()
 	model.compile(optimizer='adam', loss='mse')
 
 	return model
+
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Steering angle model trainer')
