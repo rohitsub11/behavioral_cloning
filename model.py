@@ -76,6 +76,8 @@ def get_data(X, y, data_folder, delta):
 		X.append(img)#image_preprocessing(img))
 		y.append(float(logs[i][3]) - delta)
 
+	yield (X, y)
+
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Steering angle model trainer')
 	parser.add_argument('--batch', type=int, default=128, help='Batch size.')
@@ -92,11 +94,12 @@ if __name__ == "__main__":
 	data['features'] = []
 	data['labels'] = []
 
-	get_data(data['features'], data['labels'],data_folder,0.3)
+	#get_data(data['features'], data['labels'],data_folder,0.3)
 
 	model = trial_model()
 
-	#model.fit_generator()
+	model.fit_generator(get_data(data['features'], data['labels'], data_folder, 0.3),
+						samples_per_epoch=10000, nb_epoch=args.epoch)
 
 	# serialize model to JSON
 	model_json = model.to_json()
