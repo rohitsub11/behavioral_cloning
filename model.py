@@ -42,7 +42,7 @@ def trial_model():
 	return model
 
 #to load the data from saved file
-def gen_data((data_frame, batch_size=32):
+def gen_data(data_frame, batch_size=32):
     N = data_frame.shape[0]
     batches_per_epoch = N // batch_size
 
