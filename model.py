@@ -4,8 +4,10 @@ from keras.models import Sequential
 from keras.utils import np_utils
 import json
 import argparse
-
+from keras.preprocessing.image import img_to_array, load_img
+import cv2
 import pandas as pd
+import numpy as np
 
 #data path
 data_folder = 'data/'
@@ -15,7 +17,7 @@ def trial_model():
 
 	model = Sequential()
 	model.add(Lambda(lambda x: x/255 - .5, input_shape = (row, col, channels),
-					output_shape = (row, col, channels)))
+	                                output_shape = (row, col, channels)))
 	model.add(Conv2D(24, 5, 5, subsample=(2, 2), border_mode="valid", activation='relu'))
 	#model.add(MaxPooling2D(pool_size=(2, 2)))
 	model.add(Conv2D(36, 5, 5, subsample=(2, 2), border_mode="valid", activation='relu'))
@@ -29,11 +31,11 @@ def trial_model():
 	model.add(Dense(1164, activation='relu'))
 
 	model.add(Dense(100, activation='relu'))
-	
+
 	model.add(Dense(50, activation='relu'))
-	
+
 	model.add(Dense(10, activation='relu'))
-	
+
 	model.add(Dense(1))
 
 	model.summary()
@@ -41,32 +43,82 @@ def trial_model():
 
 	return model
 
+def resize_to_target_size(image):
+	return cv2.resize(image, (200, 66))
+
+
+def crop_and_resize(image):
+	cropped_image = image[55:135, :, :]
+	processed_image = resize_to_target_size(cropped_image)
+	return processed_image
+
+def preprocess_image(image):
+	image = crop_and_resize(image)
+	image = image.astype(np.float32)
+
+	#Normalize image
+	image = image/255.0 - 0.5
+	return image
+
+def get_augmented_row(row):
+	steering = row['steering']
+
+	# randomly choose the camera to take the image from
+	camera = np.random.choice(['center', 'left', 'right'])
+
+	# adjust the steering angle for left anf right cameras
+	if camera == 'left':
+		steering += 0.25
+	elif camera == 'right':
+		steering -= 0.25
+
+	image = load_img("data/" + row[camera].strip())
+	image = img_to_array(image)
+
+	# decide whether to horizontally flip the image:
+	# This is done to reduce the bias for turning left that is present in the training data
+	flip_prob = np.random.random()
+	if flip_prob > 0.5:
+		# flip the image and reverse the steering angle
+		steering = -1*steering
+		image = cv2.flip(image, 1)
+
+	# Apply brightness augmentation
+	#image = augment_brightness_camera_images(image)
+
+	# Crop, resize and normalize the image
+	#image = preprocess_image(image)
+	image = resize_to_target_size(image)
+	return image, steering
+
 #to load the data from saved file
 def gen_data(data_frame, batch_size=32):
-    N = data_frame.shape[0]
-    batches_per_epoch = N // batch_size
+	N = data_frame.shape[0]
+	batches_per_epoch = N // batch_size
 
-    i = 0
-    while(True):
-        start = i*batch_size
-        end = start+batch_size - 1
+	i = 0
+	while(True):
+		start = i*batch_size
+		end = start+batch_size - 1
 
-        X_batch = np.zeros((batch_size, 64, 64, 3), dtype=np.float32)
-        y_batch = np.zeros((batch_size,), dtype=np.float32)
+		X_batch = np.zeros((batch_size, 66, 200, 3), dtype=np.float32)
+		y_batch = np.zeros((batch_size,), dtype=np.float32)
 
-        j = 0
+		j = 0
 
-        # slice a `batch_size` sized chunk from the dataframe
-        # and generate augmented data for each row in the chunk on the fly
-        for index, row in data_frame.loc[start:end].iterrows():
-            X_batch[j], y_batch[j] = get_augmented_row(row)
-            j += 1
+		# slice a `batch_size` sized chunk from the dataframe 
+		# and generate augmented data for each row in the chunk 
+		# on the fly
+		for index, row in data_frame.loc[start:end].iterrows():
+			X_batch[j], y_batch[j] = get_augmented_row(row)
+			j += 1
 
-        i += 1
-        if i == batches_per_epoch - 1:
-            # reset the index so that we can cycle over the data_frame again
-            i = 0
-        yield X_batch, y_batch
+		i += 1
+		if i == batches_per_epoch - 1:
+			# reset the index so that we can cycle over the 
+			# data_frame again
+			i = 0
+		yield X_batch, y_batch
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Steering angle model trainer')
@@ -81,32 +133,37 @@ if __name__ == "__main__":
 	print("loading data...")
 	data_frame = pd.read_csv('data/driving_log.csv', usecols=[0, 1, 2, 3])
 
-    # shuffle the data
-    data_frame = data_frame.sample(frac=1).reset_index(drop=True)
+	# shuffle the data
+	data_frame = data_frame.sample(frac=1).reset_index(drop=True)
 
-    # 80-20 training validation split
-    training_split = 0.8
+	# 80-20 training validation split
+	training_split = 0.8
 
-    num_rows_training = int(data_frame.shape[0]*training_split)
+	num_rows_training = int(data_frame.shape[0]*training_split)
 
-    training_data = data_frame.loc[0:num_rows_training-1]
-    validation_data = data_frame.loc[num_rows_training:]
+	training_data = data_frame.loc[0:num_rows_training-1]
+	validation_data = data_frame.loc[num_rows_training:]
 
-    # release the main data_frame from memory
-    data_frame = None
+	# release the main data_frame from memory
+	data_frame = None
 
-    training_generator = gen_data(training_data, batch_size=args.batch_size)
-    validation_data_generator = gen_data(validation_data, batch_size=args.batch_size)
+	training_generator = gen_data(training_data, batch_size=args.batch)
+	validation_data_generator = gen_data(validation_data, batch_size=args.batch)
 
 	model = trial_model()
 
-	model.fit_generator(training_generator, samples_per_epoch=10000, 
-						nb_epoch=args.epoch)#, validation_data=validation_data_generator)
+	samples = (20000//args.batch)*args.batch
+
+	model.fit_generator(training_generator, samples_per_epoch=samples,
+						nb_epoch=args.epoch)#, validation_data=validation_da$
 
 	# serialize model to JSON
 	model_json = model.to_json()
 	with open("model.json", "w") as json_file:
 		json_file.write(model_json)
-    # serialize weights to HDF5
+		# serialize weights to HDF5
 	model.save_weights("model.h5")
 	print("Saved model to disk")
+
+
+

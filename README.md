@@ -26,5 +26,5 @@ The model that I started with is based on the Nvidia Paper. The model is as foll
 
 Dropout seems to be necessary to prevent the model from overfitting. I observed that a dropout of .5 worked best through guess and check methodology.
 
-First try, I did not resize the image to see if they would go through the NVIDIA model without any problems. ** Updates to follow.**
+First try, I did not resize the image to see if they would go through the NVIDIA model without any problems. It seemed to at least run. However, I then resized the images to 66x200 so the match with the model requirements.
 
