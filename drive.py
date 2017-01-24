@@ -19,6 +19,8 @@ from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_a
 import tensorflow as tf
 tf.python.control_flow_ops = tf
 
+from model import preprocess_image
+
 
 sio = socketio.Server()
 app = Flask(__name__)
@@ -37,11 +39,14 @@ def telemetry(sid, data):
     imgString = data["image"]
     image = Image.open(BytesIO(base64.b64decode(imgString)))
     image_array = np.asarray(image)
+
+    image_array = preprocess_image(image_array)
     transformed_image_array = image_array[None, :, :, :]
     # This model currently assumes that the features of the model are just the images. Feel free to change this.
     steering_angle = float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
-    throttle = 0.2
+    #throttle = 0.3
+    throttle = max(0.1, -0.15/0.05 * abs(steering_angle) + 0.35)
     print(steering_angle, throttle)
     send_control(steering_angle, throttle)
 

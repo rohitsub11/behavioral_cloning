@@ -1,78 +1,138 @@
-from keras.layers import Conv2D, Flatten, MaxPooling2D, Dropout
-from keras.layers import Dense, Activation, Lambda
+from keras.layers import Dense, Conv2D, Flatten, Lambda
 from keras.models import Sequential
-from keras.utils import np_utils
+from keras.layers import Dropout, ELU, Activation
+import cv2
+import math
+import pandas as pd
+import numpy as np
 import json
 import argparse
 from keras.preprocessing.image import img_to_array, load_img
-import cv2
-import pandas as pd
-import numpy as np
 
 #data path
-data_folder = 'data/'
+data_path= 'data/driving_log.csv'
 
-def trial_model():
-	row, col, channels = 66, 200, 3 #camera format
+rows = 66
+cols = 200
+channels = 3
+
+EPOCH = 10
+BATCH_SIZE = 32
+
+
+def get_model():
 
 	model = Sequential()
-	model.add(Lambda(lambda x: x/255 - .5, input_shape = (row, col, channels),
-	                                output_shape = (row, col, channels)))
-	model.add(Conv2D(24, 5, 5, subsample=(2, 2), border_mode="valid", activation='relu'))
-	#model.add(MaxPooling2D(pool_size=(2, 2)))
-	model.add(Conv2D(36, 5, 5, subsample=(2, 2), border_mode="valid", activation='relu'))
-	model.add(Conv2D(48, 5, 5, subsample=(2, 2), border_mode="valid", activation='relu'))
-	#non strided convolutional layer
-	model.add(Conv2D(64, 3, 3, subsample=(1, 1), border_mode="valid", activation='relu'))
-	model.add(Conv2D(64, 3, 3, subsample=(1, 1), border_mode="valid", activation='relu'))
 
-	#FC layers
+	model.add(Lambda(lambda x: x/255 - .5, input_shape = (rows, cols, channels),
+	                                output_shape = (rows, cols, channels)))
+
+	model.add(Conv2D(24, 5, 5, subsample=(2,2), border_mode='valid', name='hidden_1'))
+	model.add(ELU())
+
+	model.add(Conv2D(36, 5, 5, subsample=(2,2), border_mode='valid', name='hidden_2'))
+	model.add(ELU())
+
+	model.add(Conv2D(48, 5, 5, subsample=(2,2), border_mode='valid', name='hidden_3'))
+	model.add(ELU())
+
+	model.add(Conv2D(64, 3, 3, subsample=(1,1), border_mode='valid', name='hidden_4'))
+	model.add(ELU())
+
+	model.add(Conv2D(64, 3, 3, subsample=(1,1), border_mode='valid', name='hidden_5'))
+
 	model.add(Flatten())
-	model.add(Dense(1164, activation='relu'))
+	model.add(Dropout(.5))#.2))
+	model.add(ELU())
 
-	model.add(Dense(100, activation='relu'))
 
-	model.add(Dense(50, activation='relu'))
+	model.add(Dense(100, name='FC1'))
+	model.add(Dropout(.5))
+	model.add(ELU())
 
-	model.add(Dense(10, activation='relu'))
+	model.add(Dense(50, name='FC2'))
+	model.add(ELU())
 
-	model.add(Dense(1))
+	model.add(Dense(10, name='FC3'))
+	model.add(ELU())
+
+	model.add(Dense(1, name='Steering_Control'))
 
 	model.summary()
+
 	model.compile(optimizer='adam', loss='mse')
 
 	return model
 
-def resize_to_target_size(image):
-	return cv2.resize(image, (200, 66))
+def get_data(filenamewithpath):
 
+	print("loading data...")
+	#only first 4 columns matter
+	data_frame = pd.read_csv(filenamewithpath, usecols=[0, 1, 2, 3])
 
-def crop_and_resize(image):
-	cropped_image = image[55:135, :, :]
-	processed_image = resize_to_target_size(cropped_image)
-	return processed_image
+	#shuffle the data
+	data_frame = data_frame.sample(frac=1).reset_index(drop=True)
+
+	print("Done loading data")
+
+	return data_frame
+
+def split_data(data):
+	
+	print("splitting data...")
+	split_factor = 0.8
+
+	num_rows_training = int(data.shape[0]*split_factor)
+
+	tdf = data.loc[0:num_rows_training-1]
+	vdf = data.loc[num_rows_training:]
+
+	print("Done splitting data")
+	return tdf, vdf
+
+def brightness_augmentation(image):
+
+	image1 = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+	random_brightness = .25 + np.random.uniform()
+
+	image1[:,:,2] = image1[:,:,2]*random_brightness
+	image1 = cv2.cvtColor(image1, cv2.COLOR_HSV2RGB)
+
+	return image1
 
 def preprocess_image(image):
-	image = crop_and_resize(image)
-	image = image.astype(np.float32)
 
-	#Normalize image
-	image = image/255.0 - 0.5
+	shape = image.shape
+	image = image[math.floor(shape[0]/5): shape[0]-25, 0:shape[1]]
+	image = cv2.resize(image, (cols, rows), interpolation=cv2.INTER_AREA)
+
 	return image
 
-def get_augmented_row(row):
+def get_augmented_image(row):
+	
 	steering = row['steering']
 
-	# randomly choose the camera to take the image from
-	camera = np.random.choice(['center', 'left', 'right'])
+	camera_view = np.random.choice(['left', 'center', 'right'])
 
-	# adjust the steering angle for left anf right cameras
-	if camera == 'left':
+	if camera_view == 'left':
 		steering += 0.25
-	elif camera == 'right':
+	elif camera_view == 'right':
 		steering -= 0.25
+	else:
+		steering = steering
 
-	image = load_img("data/" + row[camera].strip())
+	path_of_file = ("data/" + row[camera_view].strip())
+
+	image = cv2.imread(path_of_file)
+
+	image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+	#brightness augmentation
+	image = brightness_augmentation(image)
+
+	#image resizing and processing
+	image = preprocess_image(image)
+
 	image = img_to_array(image)
 
 	# decide whether to horizontally flip the image:
@@ -80,20 +140,15 @@ def get_augmented_row(row):
 	flip_prob = np.random.random()
 	if flip_prob > 0.5:
 		# flip the image and reverse the steering angle
-		steering = -1*steering
+		steering = -steering
 		image = cv2.flip(image, 1)
 
-	# Apply brightness augmentation
-	#image = augment_brightness_camera_images(image)
-
-	# Crop, resize and normalize the image
-	#image = preprocess_image(image)
-	image = resize_to_target_size(image)
 	return image, steering
 
-#to load the data from saved file
-def gen_data(data_frame, batch_size=32):
-	N = data_frame.shape[0]
+
+def gen_data(dataframe, batch_size=32):
+
+	N = dataframe.shape[0]
 	batches_per_epoch = N // batch_size
 
 	i = 0
@@ -101,7 +156,7 @@ def gen_data(data_frame, batch_size=32):
 		start = i*batch_size
 		end = start+batch_size - 1
 
-		X_batch = np.zeros((batch_size, 66, 200, 3), dtype=np.float32)
+		X_batch = np.zeros((batch_size, rows, cols, 3), dtype=np.float32)
 		y_batch = np.zeros((batch_size,), dtype=np.float32)
 
 		j = 0
@@ -109,8 +164,8 @@ def gen_data(data_frame, batch_size=32):
 		# slice a `batch_size` sized chunk from the dataframe 
 		# and generate augmented data for each row in the chunk 
 		# on the fly
-		for index, row in data_frame.loc[start:end].iterrows():
-			X_batch[j], y_batch[j] = get_augmented_row(row)
+		for index, row in dataframe.loc[start:end].iterrows():
+			X_batch[j], y_batch[j] = get_augmented_image(row)
 			j += 1
 
 		i += 1
@@ -121,49 +176,27 @@ def gen_data(data_frame, batch_size=32):
 		yield X_batch, y_batch
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser(description='Steering angle model trainer')
-	parser.add_argument('--batch', type=int, default=128, help='Batch size.')
-	parser.add_argument('--epoch', type=int, default=10, help='Number of epochs.')
-	parser.add_argument('--epochsize', type=int, default=10000, help='How many frames per epoch.')
-	parser.add_argument('--skipvalidate', dest='skipvalidate', action='store_true', help='Multiple path output.')
-	parser.set_defaults(skipvalidate=False)
-	parser.set_defaults(loadweights=False)
-	args = parser.parse_args()
 
-	print("loading data...")
-	data_frame = pd.read_csv('data/driving_log.csv', usecols=[0, 1, 2, 3])
+	temp_data = get_data(data_path)
 
-	# shuffle the data
-	data_frame = data_frame.sample(frac=1).reset_index(drop=True)
+	training_data, validation_data = split_data(temp_data)
 
-	# 80-20 training validation split
-	training_split = 0.8
+	temp_data = None
 
-	num_rows_training = int(data_frame.shape[0]*training_split)
+	gen_train_data = gen_data(training_data, batch_size=BATCH_SIZE)
 
-	training_data = data_frame.loc[0:num_rows_training-1]
-	validation_data = data_frame.loc[num_rows_training:]
+	gen_valid_data = gen_data(validation_data, batch_size=BATCH_SIZE)
 
-	# release the main data_frame from memory
-	data_frame = None
+	model = get_model()
 
-	training_generator = gen_data(training_data, batch_size=args.batch)
-	validation_data_generator = gen_data(validation_data, batch_size=args.batch)
-
-	model = trial_model()
-
-	samples = (20000//args.batch)*args.batch
-
-	model.fit_generator(training_generator, samples_per_epoch=samples,
-						nb_epoch=args.epoch)#, validation_data=validation_da$
+	model.fit_generator(gen_train_data, samples_per_epoch=20000, nb_epoch=EPOCH,
+						validation_data=gen_valid_data, nb_val_samples=3000)
 
 	# serialize model to JSON
 	model_json = model.to_json()
 	with open("model.json", "w") as json_file:
 		json_file.write(model_json)
-		# serialize weights to HDF5
+
+	# serialize weights to HDF5
 	model.save_weights("model.h5")
 	print("Saved model to disk")
-
-
-
