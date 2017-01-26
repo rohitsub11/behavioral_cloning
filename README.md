@@ -36,5 +36,7 @@ There are 2 test tracks to train the model on. One is a brighter one whilst the 
 
 After this and after reading many discussions on the forum as well as other papers, I cropped the image to remove some pixels from the top and bottom. to remove the horizon and hood of the car from the image. Then the question of resizing arose.
 
-First try, I did not resize the image to see if they would go through the NVIDIA model without any problems. It seemed to at least run. However, I then resized the images to 66x200 so the match with the model requirements. I further resized the images to 64x64 to speed up the model training and yet not losing on accuracy or increasing loss.
+First try, I did not resize the image to see if they would go through the NVIDIA model without any problems. It seemed to at least run. However, I then resized the images to 66x200 so the match with the model requirements.
+
+The model works well with the bright track. With the dark hilly track, the model works well from a not hitting the walls perspective. However, the hill climb (throttle control is the part that I am having a challenge with).
 
