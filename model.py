@@ -21,6 +21,9 @@ BATCH_SIZE = 32
 
 
 def get_model():
+	"""
+	Neural network with layers defined.
+	"""
 
 	model = Sequential()
 
@@ -65,6 +68,12 @@ def get_model():
 	return model
 
 def get_data(filenamewithpath):
+	"""
+	Loads the data from the filenamewithpath location passed into the function.
+	:filenamewithpath: input file location
+	:output: data frame of loaded data (includes images (center, left, right)
+			and steering angle )
+	"""
 
 	print("loading data...")
 	#only first 4 columns matter
@@ -78,6 +87,11 @@ def get_data(filenamewithpath):
 	return data_frame
 
 def split_data(data):
+	"""
+	Splits the data 80-20 into training and validation data.
+	:data: input data frame that needs to be split
+	:output: training and validation data frames.
+	"""
 	
 	print("splitting data...")
 	split_factor = 0.8
@@ -91,6 +105,11 @@ def split_data(data):
 	return tdf, vdf
 
 def brightness_augmentation(image):
+	"""
+	Performs brightness augmentation on the image.
+	:image: input image which needs brightness augmentation.
+	:output: Augmented image.
+	"""
 
 	image1 = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
 	random_brightness = .25 + np.random.uniform()
@@ -101,6 +120,12 @@ def brightness_augmentation(image):
 	return image1
 
 def preprocess_image(image):
+	"""
+	Processes the input image. It removes unwanted space in the image (horizon 
+	and car boot) and resizes the image to model specifications.
+	:image: input image which needs to be processed
+	:output: processed image
+	"""
 
 	shape = image.shape
 	image = image[math.floor(shape[0]/5): shape[0]-25, 0:shape[1]]
@@ -109,6 +134,14 @@ def preprocess_image(image):
 	return image
 
 def get_augmented_image(row):
+	"""
+	Returns an augmented image. Add small angles for left and right images.
+	Perform brighness augmentation, image resizing and crop the top and bottom
+	sections of the image. Also perform flip on random images to account for
+	driving on opposite direction.
+	:row: The row of dataframe to grab image and steering information
+	:output: image and steering angle
+	"""
 	
 	steering = row['steering']
 
@@ -147,6 +180,11 @@ def get_augmented_image(row):
 
 
 def gen_data(dataframe, batch_size=32):
+	"""
+	Returns features and labels from the data frame.
+	:dataframe: The input data frame from which the data needs to be generated.
+	:output: features and labels.
+	"""
 
 	N = dataframe.shape[0]
 	batches_per_epoch = N // batch_size

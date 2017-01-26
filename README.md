@@ -14,7 +14,13 @@ This project is the behavioral cloning project to drive a car in a simulator.
 
 ## Method and model ##
 
-I recorded my own images using Udacity simulator in training mode. However, Udacity had also provided their own training data which I used. 
+I recorded my own images using Udacity simulator in training mode. However, Udacity had also provided their own training data which I used. The following are some images from the dataset:
+![alt tag](data/Sample_images/Image1.jpg)
+![alt tag](data/Sample_images/Image2.jpg)
+![alt tag](data/Sample_images/Image3.jpg)
+![alt tag](data/Sample_images/Image4.jpg)
+![alt tag](data/Sample_images/Image5.jpg)
+![alt tag](data/Sample_images/Image6.jpg)
 
 The model that I started with is based on the Nvidia Paper. The model is as follows:
 
@@ -25,8 +31,11 @@ The model that I started with is based on the Nvidia Paper. The model is as foll
 
 **UPDATE I changed the model activations from relu to elu().**
 
-
 Dropout seems to be necessary to prevent the model from overfitting. I observed that a dropouts of .2 and .5 worked best through guess and check methodology and guidance from UDACITY as well as COMMA.AI.
+
+The model was trained using keras generator with batch size of 32 for 10epochs with adam optimizer at a learning rate of 0.001. The training was split into training and validation data using an 80-20 split. I used an Epoch size of 10 since beyond that the validation loss was not decreasing significantly. The model was trained with 20000 samples per epoch and validated with 3000 samples using a fit generator to prevent the training data from being stored on memory.
+
+I did not change the Nvidia mode much except for adding dropouts after the final convolution layer and the 1st fully connected layer to prevent overfitting. My loss was extermely low before adding dropout and the car would sometimes go out of the track. My main effort was with image processing to improve the accuracy of the car staying on track. The model by itself was effective from the very begining.
 
 ## Image processing ##
 
